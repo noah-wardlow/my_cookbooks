@@ -1,34 +1,45 @@
+#!/usr/bin/env python3
+
 import rclpy
 from rclpy.node import Node
-import tf2_ros
+from tf2_ros import TransformListener, Buffer
+from tf2_ros import LookupException, ConnectivityException, ExtrapolationException
 import geometry_msgs.msg
 
-class TFListenerNode(Node):
+class TFEcho(Node):
 
-    def __init__(self):
-        super().__init__('tf_listener_node')
-        self.tf_buffer = tf2_ros.Buffer()
-        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
-        self.publisher_ = self.create_publisher(geometry_msgs.msg.TransformStamped, 'base_link_transform', 10)
-        self.timer_ = self.create_timer(0.1, self.timer_callback)
+    def __init__(self, reference_frame, target_frame):
+        super().__init__('tf2_echo')
+        self.tf_buffer = Buffer()
+        self.reference_frame = reference_frame
+        self.target_frame = target_frame
 
-    def timer_callback(self):
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.publisher_ = self.create_publisher(geometry_msgs.msg.TransformStamped, 'wrist_mounted_camera_transform', 10)
+        self.create_timer(0.1, self.publish_tf)
+
+    def publish_tf(self):
         try:
-            transform = self.tf_buffer.lookup_transform('base_link', 'world', self.get_clock().now().to_msg())
-            self.publisher_.publish(transform)
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-            pass
+            trans = self.tf_buffer.lookup_transform(self.reference_frame, self.target_frame, rclpy.time.Time())
+            self.publisher_.publish(trans)
+            self.get_logger().info("Translation: {}, Rotation: {}".format(trans.transform.translation, trans.transform.rotation))
+        except (LookupException, ConnectivityException, ExtrapolationException) as e:
+            self.get_logger().warning(str(e))
+
 
 def main(args=None):
     rclpy.init(args=args)
 
-    node = TFListenerNode()
+    reference_frame = "world"
+    target_frame = "wrist_mounted_camera_color_frame"
 
-    rclpy.spin(node)
+    tf_echo_node = TFEcho(reference_frame, target_frame)
 
-    node.destroy_node()
+    rclpy.spin(tf_echo_node)
+
+    tf_echo_node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
-
