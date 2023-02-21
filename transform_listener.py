@@ -16,7 +16,8 @@ class TFEcho(Node):
 
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.publisher_ = self.create_publisher(geometry_msgs.msg.TransformStamped, 'wrist_mounted_camera_transform', 10)
-        self.create_timer(0.1, self.publish_tf)
+        # throttle to about 30hz for front end
+        self.create_timer(0.4, self.publish_tf)
 
     def publish_tf(self):
         try:
